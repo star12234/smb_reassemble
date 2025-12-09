@@ -13,11 +13,13 @@ char *output_dir = NULL; // 전역 변수 정의 (실제 메모리 할당)
  */
 static void packet_handler(u_char *user, const struct pcap_pkthdr *h, const u_char *bytes) {
     if (h->caplen < 14) return;
+    
     size_t offset = 14; // 이더넷 헤더 길이
     uint16_t eth_type = (bytes[12] << 8) | bytes[13];
     
     // VLAN(802.1Q) 태그가 있으면 건너뜀
-    if (eth_type == 0x8100 && h->caplen >= 18) {
+    if (eth_type == 0x8100 && h->caplen >= 18)
+    {
         offset += 4;
         eth_type = (bytes[offset - 2] << 8) | bytes[offset - 1];
     }
