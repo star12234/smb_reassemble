@@ -280,12 +280,14 @@ static void ensure_parent_dirs(const char *full_path) {
 void write_file_chunk(connection_t *conn, const uint8_t *file_id, uint64_t offset, const uint8_t *data, size_t len) {
     file_ctx_t *ctx;
     // 1. 이미 열려있는 파일 중에서 찾기
-    for (ctx = open_files; ctx; ctx = ctx->next) {
+    for (ctx = open_files; ctx; ctx = ctx->next) 
+    {
         if (memcmp(ctx->file_id, file_id, 16) == 0) break;
     }
     
     // 2. 없으면 새로 열기
-    if (!ctx) {
+    if (!ctx) 
+    {
         char path[1024];
         const file_name_map_t *m;
         const char *name = NULL;
@@ -295,15 +297,19 @@ void write_file_chunk(connection_t *conn, const uint8_t *file_id, uint64_t offse
          * 일부 경우 CREATE 응답과 WRITE 요청이 다른 연결에서 오기 때문에 전역
          * 리스트를 통해서도 매핑을 확인해야 한다.
          */
-        for (m = conn ? conn->file_names : NULL; m; m = m->next) {
-            if (memcmp(m->file_id, file_id, 16) == 0) {
+        for (m = conn ? conn->file_names : NULL; m; m = m->next) 
+        {
+            if (memcmp(m->file_id, file_id, 16) == 0) 
+            {
                 name = m->name;
                 break;
             }
         }
         if (!name) {
-            for (m = global_file_names; m; m = m->next) {
-                if (memcmp(m->file_id, file_id, 16) == 0) {
+            for (m = global_file_names; m; m = m->next) 
+            {
+                if (memcmp(m->file_id, file_id, 16) == 0) 
+                {
                     name = m->name;
                     break;
                 }
@@ -326,7 +332,8 @@ void write_file_chunk(connection_t *conn, const uint8_t *file_id, uint64_t offse
         ctx->path = strdup(path);
         ctx->fp = fopen(path, "wb"); // 바이너리 쓰기 모드로 파일 오픈
 
-        if (!ctx->fp) {
+        if (!ctx->fp) 
+        {
             fprintf(stderr, "Failed to open %s\n", path);
             free(ctx->path);
             free(ctx);
@@ -346,7 +353,8 @@ void write_file_chunk(connection_t *conn, const uint8_t *file_id, uint64_t offse
 
 /* 프로그램 종료 시 호출되어 모든 파일을 닫음 */
 void close_all_files() {
-    for (file_ctx_t *ctx = open_files; ctx; ctx = ctx->next) {
+    for (file_ctx_t *ctx = open_files; ctx; ctx = ctx->next) 
+    {
         if (ctx->fp) fclose(ctx->fp);
         if (ctx->path) free(ctx->path);
     }

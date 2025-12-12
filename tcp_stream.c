@@ -2,7 +2,7 @@
 
 static connection_t *connections = NULL; // 전역 연결 리스트
 
-/* 두 키(IP/Port)가 같은지 비교하는 함수 */
+/* ip/port 가 같은지 비교하는 함수 */
 static int conn_key_equal(const conn_key_t *a, const conn_key_t *b) {
     return a->cli_ip == b->cli_ip && a->cli_port == b->cli_port &&
            a->srv_ip == b->srv_ip && a->srv_port == b->srv_port;
@@ -12,8 +12,10 @@ static int conn_key_equal(const conn_key_t *a, const conn_key_t *b) {
 connection_t *get_connection(const conn_key_t *key) {
     connection_t *c;
     // 기존 리스트 순회
-    for (c = connections; c; c = c->next) {
-        if (conn_key_equal(&c->key, key)) return c;
+    for (c = connections; c; c = c->next)
+    {
+        if (conn_key_equal(&c->key, key))
+            return c;
     }
     // 없으면 생성
     c = (connection_t *)calloc(1, sizeof(connection_t));
@@ -50,7 +52,7 @@ void smb_feed_bytes(connection_t *conn, int dir, const uint8_t *data, size_t len
     
     size_t pos = 0; // 버퍼 내 처리 위치
     while (s->buf_len - pos >= 4) {
-        // NBSS 헤더 파싱 (Big Endian)
+        // NBSS 는 3바이트 길이 (빅엔디언)
         uint32_t nbss_len = (s->buf[pos + 1] << 16) | (s->buf[pos + 2] << 8) | s->buf[pos + 3];
         size_t total_len = 4 + nbss_len;
         
@@ -77,11 +79,14 @@ void feed_tcp_payload(connection_t *conn, int dir, uint32_t seq, const uint8_t *
     if (len == 0) return;
     
     // 간단한 재조합 로직 (Out-of-order 패킷은 드롭하여 복잡도 낮춤)
-    if (!ts->has_next_seq) {
+    if (!ts->has_next_seq) //다음 시퀀스가 0이 아니면
+    { 
         ts->next_seq = seq + len;
         ts->has_next_seq = 1;
         smb_feed_bytes(conn, dir, payload, len);
-    } else if (seq == ts->next_seq) {
+    } 
+    else if (seq == ts->next_seq)
+    {
         ts->next_seq += len;
         smb_feed_bytes(conn, dir, payload, len);
     }

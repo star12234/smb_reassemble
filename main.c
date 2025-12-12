@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include "smb_reassemble.h"
 #include <pcap.h>
 #include <netinet/ip.h>
@@ -17,7 +18,8 @@ static void packet_handler(u_char *user, const struct pcap_pkthdr *h, const u_ch
     uint16_t eth_type = (bytes[12] << 8) | bytes[13];
     
     // VLAN(802.1Q) 태그가 있으면 건너뜀
-    if (eth_type == 0x8100 && h->caplen >= 18) {
+    if (eth_type == 0x8100 && h->caplen >= 18) //18은 Src mac(6) + Dst mac(6) + TPID(2) + EtherType(2)
+    {
         offset += 4;
         eth_type = (bytes[offset - 2] << 8) | bytes[offset - 1];
     }
@@ -26,18 +28,18 @@ static void packet_handler(u_char *user, const struct pcap_pkthdr *h, const u_ch
     const struct ip *ip = (const struct ip *)(bytes + offset);
     if (ip->ip_p != IPPROTO_TCP) return;
     
-    uint32_t ip_hdr_len = ip->ip_hl * 4;
+    uint32_t ip_hdr_len = ip->ip_hl * 4;  //ip_hl은 리틀엔디언 4바이트
     const struct tcphdr *tcp = (const struct tcphdr *)((const uint8_t *)ip + ip_hdr_len);
     
-    size_t ip_len = ntohs(ip->ip_len);
+    size_t ip_len = ntohs(ip->ip_len); //ntohs는 네트워크 바이트 순서를 호스트바이트 순서로 변환
     size_t tcp_hdr_len = tcp->th_off * 4;
     if (ip_len < ip_hdr_len + tcp_hdr_len) return;
     
     size_t payload_len = ip_len - ip_hdr_len - tcp_hdr_len;
     const uint8_t *payload = (const uint8_t *)tcp + tcp_hdr_len;
     
-    uint16_t src_port = ntohs(tcp->th_sport);
-    uint16_t dst_port = ntohs(tcp->th_dport);
+    uint16_t src_port = ntohs(tcp->th_sport); //출발지 포트
+    uint16_t dst_port = ntohs(tcp->th_dport); //도착지 포트
     
     // SMB 포트(445, 139)가 아니면 무시
     if (src_port != 445 && src_port != 139 && dst_port != 445 && dst_port != 139) return;
