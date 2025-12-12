@@ -14,6 +14,7 @@ char *output_dir = NULL; // 전역 변수 정의 (실제 메모리 할당)
  */
 static void packet_handler(u_char *user, const struct pcap_pkthdr *h, const u_char *bytes) {
     if (h->caplen < 14) return;
+    
     size_t offset = 14; // 이더넷 헤더 길이
     uint16_t eth_type = (bytes[12] << 8) | bytes[13];
     
