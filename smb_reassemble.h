@@ -1,5 +1,5 @@
-#ifndef COMMON_H
-#define COMMON_H
+#ifndef smb_reassemble_H
+#define smb_reassemble_H
 
 #include <stdint.h>
 #include <stdio.h>
@@ -14,13 +14,11 @@
  * [상수 정의] SMB 프로토콜 명령어 코드
  * -------------------------------------------------------------------------- */
 
-/* [FIX] 누락되었던 SMB1 명령어 정의 추가 */
 enum smb1_commands {
     SMB1_COM_WRITE       = 0x0B,
     SMB1_COM_WRITE_ANDX  = 0x2F
 };
 
-/* SMB2/3 명령어 */
 enum smb2_commands {
     SMB2_CREATE = 0x0005,
     SMB2_READ   = 0x0008,
@@ -39,10 +37,14 @@ typedef struct conn_key {
     uint32_t srv_ip; uint16_t srv_port;
 } conn_key_t;
 
-/* TCP 스트림 상태 (시퀀스 넘버 추적용) */
+/* [수정됨] 재조합용 프래그먼트 구조체 전방 선언 */
+struct tcp_fragment;
+
+/* [수정됨] TCP 스트림 상태 (순서 어긋난 패킷 보관용 리스트 추가) */
 typedef struct tcp_stream {
     uint32_t next_seq;
     int has_next_seq;
+    struct tcp_fragment *fragments; /* [NEW] 대기 중인 패킷 리스트 */
 } tcp_stream_t;
 
 /* SMB2 READ 요청 대기열 */
@@ -54,7 +56,7 @@ typedef struct pending_read {
     struct pending_read *next;
 } pending_read_t;
 
-/* SMB2 CREATE 요청 대기열 (요청 시 파일명을 임시 저장) */
+/* SMB2 CREATE 요청 대기열 */
 typedef struct pending_create {
     uint64_t msg_id;
     char *name;
@@ -81,8 +83,8 @@ typedef struct connection {
     conn_key_t key;
     tcp_stream_t tcp[2];
     smb_stream_t smb[2];
-    pending_create_t *pending_creates; /* CREATE 요청 대기열 */
-    file_name_map_t *file_names;       /* 복구된 파일명 매핑 리스트 */
+    pending_create_t *pending_creates;
+    file_name_map_t *file_names;
     struct connection *next;
 } connection_t;
 

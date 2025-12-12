@@ -1,5 +1,5 @@
 #include "smb_reassemble.h"
-#include <pcap.h>
+#include "pcap.h"
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
 
