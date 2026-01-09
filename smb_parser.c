@@ -1,15 +1,5 @@
 #include "smb_reassemble.h"
 
- //* - READ/WRITE Request의 FileID Offset을 16으로 강제 고정.
-
-
-/* [DEBUG] Hex 값을 보기 좋게 출력하는 함수
-static void print_hex_id(const char *label, const uint8_t *id) {
-    printf("%s: ", label);
-    for (int i = 0; i < 16; i++) printf("%02x", id[i]);
-    printf("\n");
-}
-*/
 /* READ 요청 기록 */
 static void record_pending_read(connection_t *conn, uint64_t msg_id, const uint8_t *body, size_t len) {
     if (len < 48) return;
@@ -50,9 +40,6 @@ static void handle_read_response(connection_t *conn, uint64_t msg_id, const uint
     if (!pr) return;
     
     *prev = pr->next;
-    
-    // [DEBUG] 어떤 ID로 쓰기를 시도하는지 출력
-    // print_hex_id("[DEBUG] READ Resp processing ID", pr->file_id);
     
     write_file_chunk(conn, pr->file_id, pr->offset, body + data_start, data_length);
     free(pr);
@@ -111,12 +98,8 @@ static void handle_create_response(connection_t *conn, uint64_t msg_id, const ui
     if (len < 80) return;
 
     // Offset 64 is standard for Create Response FileId
-    const uint8_t *file_id = body + 64; 
-    
-    // [DEBUG] 매핑되는 ID 확인
-    printf("[INFO] Mapped ID to Name: %s\n", pc->name);
-    // print_hex_id("       -> ID", file_id);
-
+    const uint8_t *file_id = body + 64;
+ 
     remember_file_name(conn, file_id, pc->name);
     
     *prev = pc->next;
@@ -152,7 +135,7 @@ void parse_smb2_message(connection_t *conn, int dir, const uint8_t *msg, size_t 
                     uint64_t file_offset = 0;
                     for (int i = 0; i < 8; i++) file_offset |= ((uint64_t)body[8 + i]) << (8 * i);
                     
-                    // [핵심 수정] SMB2 WRITE Request의 FileID 위치는 16입니다!
+                    // SMB2 WRITE Request의 FileID 위치는 16
                     const uint8_t *file_id = body + 16;
                     
                     if (data_offset >= 64) {
