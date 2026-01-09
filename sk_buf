@@ -1,0 +1,158 @@
+
+/* 커널레벨에서의 메모리 절약을 위한 union 사용*/
+struct sk_buff {
+    union {
+        struct {
+            struct sk_buff          *next; // 이중연결리스트
+            struct sk_buff          *prev; // 수신 큐, 전송큐 앞/뒤 패킷을 가르킴
+            union {
+                struct net_device       *dev; //NIC
+                unsigned long           dev_scratch; // 디바이스 포인터 대신 임시데이터 저장
+            };
+        };
+        struct rb_node          rbnode; // *next, *prev 대신 레드-블랙트리구조로 노드로 사용될때 쓰임 TCP 전송큐
+        struct list_head        list;  // 표준리스트 API, 락-레스 리스트 구조체
+        struct llist_node       ll_node;
+    };
+    struct sock             *sk; //패킷이 소유하고 있는 소캣 L4 할당 x NULL
+    union {
+        ktime_t tstamp;  //패킷 전송 수신 타임스탬프
+        u64 skb_mstamp_ns;
+    };
+    char cb[48] ; //각 계층을 지날때마다 프로토콜의 사적인 데이터 저장공간 TCP 헤더옵션 등
+    union {
+        struct {
+            unsigned long   _skb_refdst; //라우팅 테이블 조회결과 dst 정보 저장
+            void (*destructor)(struct sk_buff *skb); //sk_buff가 메모리에서 해제될때 소켓 버퍼메모리 반환
+        };
+        struct list_head        tcp_tsorted_anchor; //TCP 시간순 패킷 정렬 리스트 헤드
+#ifdef CONFIG_NET_SOCK_MSG;
+        unsigned long           _sk_redir;
+#endif;
+    };
+#if defined(CONFIG_NF_CONNTRACK) || defined(CONFIG_NF_CONNTRACK_MODULE);
+    unsigned long            _nfct; //netfilter 패킷의 세션,상태 추적
+#endif;
+    unsigned int            len, data_len; //패킷 전체길이,실제데이터길이(len-data_len)
+    __u16 mac_len, hdr_len; //L2 헤더길이 , Clone패킷인경우 쓰기 가능한 헤더공간 길이
+    __u16 queue_mapping; // 멀티 큐 NIC를 사용할 때 패킷이 몇번째 큐를 이용했는지,할지
+#ifdef __BIG_ENDIAN_BITFIELD;
+#define CLONED_MASK     (1 << 7);
+#else;
+#define CLONED_MASK     1;
+#endif;
+#define CLONED_OFFSET           offsetof(struct sk_buff, __cloned_offset);
+    __u8 cloned:1, nohdr:1, fclone:2, peeked:1, head_frag:1, pfmemalloc:1, pp_recycle:1;
+#ifdef CONFIG_SKB_EXTENSIONS;
+    __u8 active_extensions;
+#endif;
+    __u8 pkt_type:3;
+    __u8 ignore_df:1;
+    __u8 dst_pending_confirm:1;
+    __u8 ip_summed:2;
+    __u8 ooo_okay:1;
+    __u8 tstamp_type:2;
+#ifdef CONFIG_NET_XGRESS;
+    __u8 tc_at_ingress:1;
+    __u8 tc_skip_classify:1;
+#endif;
+    __u8 remcsum_offload:1;
+    __u8 csum_complete_sw:1;
+    __u8 csum_level:2;
+    __u8 inner_protocol_type:1;
+    __u8 l4_hash:1;
+    __u8 sw_hash:1;
+#ifdef CONFIG_WIRELESS;
+    __u8 wifi_acked_valid:1;
+    __u8 wifi_acked:1;
+#endif;
+    __u8 no_fcs:1;
+    __u8 encapsulation:1;
+    __u8 encap_hdr_csum:1;
+    __u8 csum_valid:1;
+#ifdef CONFIG_IPV6_NDISC_NODETYPE;
+    __u8 ndisc_nodetype:2;
+#endif;
+#if IS_ENABLED(CONFIG_IP_VS);
+    __u8 ipvs_property:1;
+#endif;
+#if IS_ENABLED(CONFIG_NETFILTER_XT_TARGET_TRACE) || IS_ENABLED(CONFIG_NF_TABLES);
+    __u8 nf_trace:1;
+#endif;
+#ifdef CONFIG_NET_SWITCHDEV;
+    __u8 offload_fwd_mark:1;
+    __u8 offload_l3_fwd_mark:1;
+#endif;
+    __u8 redirected:1;
+#ifdef CONFIG_NET_REDIRECT;
+    __u8 from_ingress:1;
+#endif;
+#ifdef CONFIG_NETFILTER_SKIP_EGRESS;
+    __u8 nf_skip_egress:1;
+#endif;
+#ifdef CONFIG_SKB_DECRYPTED;
+    __u8 decrypted:1;
+#endif;
+    __u8 slow_gro:1;
+#if IS_ENABLED(CONFIG_IP_SCTP);
+    __u8 csum_not_inet:1;
+#endif;
+    __u8 unreadable:1;
+#if defined(CONFIG_NET_SCHED) || defined(CONFIG_NET_XGRESS);
+    __u16 tc_index; //트래픽컨트롤에서 사용하는 클래스 ID, 인덱스
+#endif;
+    u16 alloc_cpu; // sk_buff가 처음할당된 CPU코어 호
+    union {
+        __wsum csum; //체크섬 값 저장
+        struct {
+            __u16 csum_start; //하드웨어 체크섬 오프로딩시 어디서부터
+            __u16 csum_offset; //어디에 기록할것인지 NIC에 대한 좌표
+        };
+    };
+    __u32 priority; //패킷의 Qos 우선순위
+    int skb_iif; //패킷수신 인터페이스 인덱스
+    __u32 hash; //패킷 스케쥴링, 흐름관리를 위한 계산된 패킷해시값
+    union {
+        u32 vlan_all; 
+        struct {
+            __be16 vlan_proto; //Vlan 프로토콜 ID (802.1Q)
+            __u16 vlan_tci; //하드웨어 가속시 VLAN헤더 삭제 여기에 저장
+        };
+    };
+#if defined(CONFIG_NET_RX_BUSY_POLL) || defined(CONFIG_XPS);
+    union {
+        unsigned int    napi_id;
+        unsigned int    sender_cpu;
+    };
+#endif;
+#ifdef CONFIG_NETWORK_SECMARK;
+    __u32 secmark;
+#endif;
+    union {
+        __u32 mark; //iptable등 패킷에 표식
+        __u32 reserved_tailroom;
+    };
+    union {
+        __be16 inner_protocol;
+        __u8 inner_ipproto; 
+    };
+    /*encapsulation inner_*_header*/
+    __u16 inner_transport_header; //L4
+    __u16 inner_network_header; //L3
+    __u16 inner_mac_header; //L2
+    __be16 protocol; //L3 드라이버가 패킷을 올릴때
+    __u16 transport_header;
+    __u16 network_header;
+    __u16 mac_header;
+#ifdef CONFIG_KCOV;
+    u64 kcov_handle;
+#endif;
+    sk_buff_data_t tail; //유효패킷 끝지점   end - tail 데이터 추가를 위해 남긴 뒷공간
+    sk_buff_data_t end; //할당된 메모리 버퍼 젤끝
+    unsigned char           *head, *data; // 할당메모리버퍼 처음, 현재유효패킷 시작지점(뒤로밀릴수있음)
+    unsigned int            truesize; //실제 메모리 점유량, 버퍼한도계산시 사용                   // data - head 헤더를 추가위해 남긴 앞공간
+    refcount_t users; //sk_buff를 참조하고 있는 객체수 if(users == 0)  free; 
+#ifdef CONFIG_SKB_EXTENSIONS;
+    struct skb_ext          *extensions; //MPLS, Bridge VLAN 추가 데이터를 연결하는 포인터
+#endif;
+};
